@@ -1,0 +1,70 @@
+name: RDP Killer Pro
+
+on:
+  workflow_dispatch:
+    inputs:
+      osChoice:
+        description: 'Pilih Versi Windows Server'
+        required: true
+        type: choice
+        default: 'windows-2022'
+        options:
+          - windows-latest
+          - windows-2025
+          - windows-2022
+      customUsername:
+        description: 'Username RDP'
+        required: true
+        type: string
+        default: 'admin'
+      customPassword:
+        description: 'Password RDP (Min 8 karakter)'
+        required: true
+        type: string
+        default: 'Rahasia123!'
+
+jobs:
+  build-rdp:
+    runs-on: ${{ github.event.inputs.osChoice }}
+    timeout-minutes: 360
+
+    steps:
+      - name: 🚀 Menyiapkan Windows RDP Mandiri
+        env:
+          USER: ${{ github.event.inputs.customUsername }}
+          PASS: ${{ github.event.inputs.customPassword }}
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: |
+          Write-Host "1. Membuat User Windows..."
+          net user $env:USER $env:PASS /add
+          net localgroup administrators $env:USER /add
+          
+          Write-Host "2. Mengaktifkan fitur RDP..."
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          
+          Write-Host "3. Mengunduh dan Menjalankan Ngrok..."
+          Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
+          Expand-Archive ngrok.zip -DestinationPath .
+          .\ngrok.exe config add-authtoken $env:NGROK_AUTH_TOKEN
+          Start-Process -FilePath ".\ngrok.exe" -ArgumentList "tcp 3389" -NoNewWindow
+          
+          Write-Host "4. Menunggu Ngrok mendapatkan URL..."
+          Start-Sleep -Seconds 10
+          $ngrokResponse = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels"
+          $rdpUrl = $ngrokResponse.tunnels[0].public_url
+          
+          Write-Host "========================================"
+          Write-Host "🎉 RDP BERHASIL DIBUAT! 🎉"
+          Write-Host "IP & Port  : $rdpUrl"
+          Write-Host "Username   : $env:USER"
+          Write-Host "Password   : $env:PASS"
+          Write-Host "========================================"
+          
+          Write-Host "Menjaga RDP tetap hidup (Mencegah GitHub Timeout)..."
+          $counter = 0
+          while ($true) { 
+              Start-Sleep -Seconds 900
+              $counter++
+              Write-Host "Ping Keep-Alive #$counter - RDP masih aktif..."
+          }

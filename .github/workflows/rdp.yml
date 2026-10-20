@@ -21,7 +21,7 @@ on:
         description: 'Password RDP (Min 8 karakter)'
         required: true
         type: string
-        default: 'Rahasia123!'
+        default: 'Kiki123!'
 
 jobs:
   build-rdp:
